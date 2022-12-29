@@ -1,0 +1,139 @@
+# SW8180 udev 匹配
+# udevadm info -a <device> 查看信息
+#
+# 线卡插入, 触发online, 使能pwr_en中对应位, 默认为0xFC, 不操作
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="online", ATTR{slot_pwr_en}=ATTR{add_slot}
+#
+# 线卡拔出, 触发offine, 禁止pwr_en中对应位, 默认为0xFC, 不操作
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="offline", ATTR{slot_pwr_en}=ATTR{remove_slot}
+
+
+##### 				初始化
+# 初始化cpld echo "8180-cpld 0x04" > > /sys/bus/i2c/devices/i2c-0/new_device
+# 	RUN+="/bin/bash -c 'pca9548 0x72 > /sys/%p/../i2c-0/new_device'" 
+# 8180-pio 0x20 为电源板
+KERNEL=="0-0004", SUBSYSTEM=="i2c", ENV{MODALIAS}=="i2c:8180-cpld", \
+	ACTION=="add", \
+	RUN+="/usr/sbin/insmod /root/zdx/cpld/sw8180-cpld.ko", \
+	RUN+="/bin/bash -c 'echo 8180-pio 0x20 > /sys%p/../i2c-2/new_device'"
+
+####				移除设备
+KERNEL=="0-0004", SUBSYSTEM=="i2c", ENV{MODALIAS}=="i2c:8180-cpld", \
+	ACTION=="remove", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/2-0020 ] && echo 0x20 > /sys/bus/i2c/devices/i2c-2/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/3-0005 ] && echo 0x05 > /sys/bus/i2c/devices/i2c-3/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/4-0005 ] && echo 0x05 > /sys/bus/i2c/devices/i2c-4/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/5-0005 ] && echo 0x05 > /sys/bus/i2c/devices/i2c-5/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/5-0020 ] && echo 0x20 > /sys/bus/i2c/devices/i2c-5/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/6-0005 ] && echo 0x05 > /sys/bus/i2c/devices/i2c-6/delete_device'", \
+	RUN+="/bin/bash -c '[ -d /sys/bus/i2c/devices/6-0020 ] && echo 0x20 > /sys/bus/i2c/devices/i2c-6/delete_device'", \
+	RUN+="/usr/sbin/rmmod sw8180_cpld"
+
+
+####				线卡插入, 触发online
+
+
+# slot 1 高速卡 1 add_slot==0x4 DS250待补充
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="online", ATTR{add_slot}=="0x4", \
+	RUN+="/bin/bash -c 'echo 8180-hs 0x05 > /sys%p/../i2c-3/new_device'"
+
+
+# slot 2 高速卡 2 add_slot==0x8 DS250待补充
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="online", ATTR{add_slot}=="0x8", \
+	RUN+="/bin/bash -c 'echo 8180-hs 0x05 > /sys%p/../i2c-4/new_device'"
+
+
+# slot 3 低速卡 1 add_slot==0x10 DS100待补充  pio 0x20 phy reset
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="online", ATTR{add_slot}=="0x10", \
+	RUN+="/bin/bash -c 'echo 8180-ls 0x05 > /sys%p/../i2c-5/new_device'", \
+	RUN+="/bin/bash -c 'echo 8180-pio 0x20 > /sys%p/../i2c-5/new_device'" 
+# 存在cpld reset操作 初始为0x7F
+KERNEL=="5-0005", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-ls", ACTION=="bind", \
+	ATTR{phy_reset}="0x01", ATTR{phy_reset}="0x7F"	
+# phy reset操作, dir为output, 拉低, 拉高
+KERNEL=="5-0020", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-pio", ACTION=="bind", \
+	ATTR{pio_dir0}="0x00", ATTR{pio_dir1}="0x00", \
+	ATTR{pio_output0}="0x00", ATTR{pio_output1}="0x00", \
+	ATTR{pio_output0}="0xFF", ATTR{pio_output1}="0xFF"
+
+# phy reset 操作需要在文件节点后通知
+# slot 4 低速卡 2 add_slot==0x20 DS100待补充, pio 0x20 phy reset
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="online", ATTR{add_slot}=="0x20", \
+	RUN+="/bin/bash -c 'echo 8180-ls 0x05 > /sys%p/../i2c-6/new_device'", \
+	RUN+="/bin/bash -c 'echo 8180-pio 0x20 > /sys%p/../i2c-6/new_device'" 
+# 存在cpld reset操作 初始为0x7F
+KERNEL=="6-0005", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-ls", ACTION=="bind", \
+	ATTR{phy_reset}="0x01", ATTR{phy_reset}="0x7F"
+# phy reset操作, dir为output, 拉低, 拉高
+KERNEL=="6-0020", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-pio", ACTION=="bind", \
+	ATTR{pio_dir0}="0x00", ATTR{pio_dir1}="0x00", \
+	ATTR{pio_output0}="0x00", ATTR{pio_output1}="0x00", \
+	ATTR{pio_output0}="0xFF", ATTR{pio_output1}="0xFF"
+
+
+# slot 5
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="online", ATTR{add_slot}=="", \
+#	RUN+=""
+
+
+# slot 6
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="online", ATTR{add_slot}=="", \
+#	RUN+=""
+####				end 线卡插入
+
+
+
+#### 线卡拔出, 触发offline
+
+
+# slot 1 高速卡 1 remove_slot==0x4 
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="offline", ATTR{remove_slot}=="0x4", \
+	RUN+="/bin/bash -c 'echo 0x05 > /sys%p/../i2c-3/delete_device'"
+
+
+# slot 2 高速卡 2 remove_slot==0x8 
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="offline", ATTR{remove_slot}=="0x8", \
+	RUN+="/bin/bash -c 'echo 0x05 > /sys%p/../i2c-4/delete_device'"
+
+
+# slot 3 低速卡 1 remove_slot==0x10 
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="offline", ATTR{remove_slot}=="0x10", \
+	RUN+="/bin/bash -c 'echo 0x05 > /sys%p/../i2c-5/delete_device'", \
+	RUN+="/bin/bash -c 'echo 0x20 > /sys%p/../i2c-5/delete_device'"
+
+
+# slot 4 低速卡 2 remove_slot==0x20 
+KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+	ATTR{name}=="8180-cpld", ACTION=="offline", ATTR{remove_slot}=="0x20", \
+	RUN+="/bin/bash -c 'echo 0x05 > /sys%p/../i2c-6/delete_device'", \
+	RUN+="/bin/bash -c 'echo 0x20 > /sys%p/../i2c-6/delete_device'"
+
+	
+# slot 5
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="offline", ATTR{remove_slot}=="", \
+#	RUN+=""
+#
+#
+# slot 6
+#KERNEL=="0-0004", SUBSYSTEM=="i2c", DRIVER=="sw8180-i2c-dev", \
+#	ACTION=="offline", ATTR{remove_slot}=="", \
+#	RUN+=""
+#
+#
+#### end 线卡拔出
